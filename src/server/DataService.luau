@@ -48,8 +48,24 @@ local function defaultProfile(): any
 	local now = os.time()
 	return {
 		version = Config.DataVersion,
-		coins = 0,
+
+		coins = Config.Economy.StartingCoins,
 		totalCoinsEarned = 0,
+
+		xp = 0,
+		level = 1,
+		-- Stored rather than derived from level, so a future balance change to
+		-- unlockLevel can never take a tower away from someone who earned it.
+		unlockedTowers = { "pea" },
+
+		stats = {
+			runsPlayed = 0,
+			bestWave = 0,
+			bestRunCoins = 0,
+			totalCursesTaken = 0,
+			deathsWhileCursed = 0,
+		},
+
 		firstJoinTime = now,
 		lastJoinTime = now,
 		sessionCount = 0,
@@ -102,19 +118,42 @@ end
 	Add a branch per version bump; never delete an old branch, or players who
 	haven't logged in since that version lose their data.
 ]]
+local function deepCopy(value: any): any
+	if type(value) ~= "table" then
+		return value
+	end
+	local copy = {}
+	for k, v in value do
+		copy[k] = deepCopy(v)
+	end
+	return copy
+end
+
+--[[
+	Recursively fills in fields the stored profile predates.
+
+	The recursion matters. A flat backfill would give a profile missing `stats`
+	an empty table, and the next `stats.runsPlayed += 1` would throw on nil.
+	Nested groups need their scalars filled individually, not the container
+	stubbed. Arrays and open maps default to empty, so recursing into them is a
+	no-op rather than a hazard.
+]]
+local function backfill(target: any, defaults: any)
+	for key, value in defaults do
+		if target[key] == nil then
+			target[key] = deepCopy(value)
+		elseif type(value) == "table" and type(target[key]) == "table" then
+			backfill(target[key], value)
+		end
+	end
+end
+
 local function migrate(profile: any): any
 	if profile.version == nil then
 		profile.version = 0
 	end
 
-	-- Backfill any field added after the profile was written. Cheap and covers
-	-- the common case of "I added a counter".
-	local defaults = defaultProfile()
-	for key, value in defaults do
-		if profile[key] == nil then
-			profile[key] = if type(value) == "table" then {} else value
-		end
-	end
+	backfill(profile, defaultProfile())
 
 	profile.version = Config.DataVersion
 	return profile
@@ -210,15 +249,11 @@ function DataService.save(player: Player, finalize: boolean?): boolean
 	end
 
 	-- Snapshot so a mutation during the yielding write can't produce a torn
-	-- record. table.clone is shallow, so nested tables are cloned explicitly —
-	-- a shallow clone alone would still share `processedReceipts` with live
-	-- code and defeat the point.
-	local snapshot = table.clone(profile)
-	for key, value in profile do
-		if type(value) == "table" then
-			snapshot[key] = table.clone(value)
-		end
-	end
+	-- record. Must be a DEEP copy: the profile nests two levels (stats,
+	-- unlockedTowers), and the match tick mutates profile state while a save is
+	-- in flight, so a shallow clone racing the write is routine rather than
+	-- theoretical.
+	local snapshot = deepCopy(profile)
 
 	local ok, err = pcall(function()
 		store:UpdateAsync(keyFor(player), function(_old)

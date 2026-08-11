@@ -28,7 +28,7 @@ local Telemetry = {}
 Telemetry.OnboardingStep = {
 	Joined = { 1, "Joined" },
 	DataLoaded = { 2, "DataLoaded" },
-	FirstClick = { 3, "FirstClick" },
+	FirstRun = { 3, "FirstRun" },
 	FirstShopOpen = { 4, "FirstShopOpen" },
 	FirstPurchase = { 5, "FirstPurchase" },
 }

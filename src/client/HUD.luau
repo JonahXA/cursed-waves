@@ -1,16 +1,19 @@
 --[[
-	HUD — throwaway UI built in code.
+	HUD — run status, tower shop, the curse prompt, and feedback.
 
-	This is intentionally plain. Phase 0 is a pipeline test, and spending time on
-	UI polish here would be the exact mistake the feasibility report warns about:
-	art and juice matter enormously for retention, but only once you have proof
-	the loop and the plumbing work at all.
+	The curse prompt is deliberately the loudest thing on screen. It is the one
+	decision that makes this game not a generic tower defense, and burying it in
+	a corner would waste the entire differentiator.
 
-	The HUD renders state it is given. It never computes a balance locally — the
-	server is the only thing that knows how many coins you have.
+	The HUD renders state it is given. It never computes cash, damage, payout or
+	rot odds — the server owns those, and shipping the formulas here would let a
+	hooked client disagree about what a wave is worth.
 ]]
 
 local Players = game:GetService("Players")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local HUD = {}
 HUD.__index = HUD
@@ -19,6 +22,23 @@ local function corner(parent: Instance, radius: number)
 	local c = Instance.new("UICorner")
 	c.CornerRadius = UDim.new(0, radius)
 	c.Parent = parent
+end
+
+local function label(props): TextLabel
+	local l = Instance.new("TextLabel")
+	l.Size = props.size or UDim2.fromOffset(200, 40)
+	l.Position = props.position or UDim2.fromOffset(0, 0)
+	l.BackgroundColor3 = props.bg or Color3.fromRGB(22, 24, 30)
+	l.BackgroundTransparency = props.transparency or 0.15
+	l.BorderSizePixel = 0
+	l.Text = props.text or ""
+	l.TextScaled = true
+	l.Font = Enum.Font.GothamBold
+	l.TextColor3 = props.color or Color3.new(1, 1, 1)
+	if props.bg == nil and props.transparency == nil then
+		corner(l, 8)
+	end
+	return l
 end
 
 local function button(text: string, color: Color3, size: UDim2, position: UDim2): TextButton
@@ -38,125 +58,431 @@ end
 
 function HUD.new()
 	local self = setmetatable({}, HUD)
+	self.selectedTower = nil
+	self.selectedPlacedTower = nil
+	self.toastCounter = 0
 
 	local gui = Instance.new("ScreenGui")
-	gui.Name = "Phase0HUD"
+	gui.Name = "CursedWavesHUD"
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	self.gui = gui
 
-	-- Coin counter
-	local counter = Instance.new("TextLabel")
-	counter.Name = "Coins"
-	counter.Size = UDim2.fromOffset(240, 56)
-	counter.Position = UDim2.fromOffset(16, 16)
-	counter.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
-	counter.BackgroundTransparency = 0.15
-	counter.BorderSizePixel = 0
-	counter.Text = "0 coins"
-	counter.TextScaled = true
-	counter.Font = Enum.Font.GothamBold
-	counter.TextColor3 = Color3.fromRGB(255, 214, 66)
-	corner(counter, 10)
-	counter.Parent = gui
-	self.counter = counter
+	-- ---------- top-left: persistent ----------
+	self.coins = label({
+		text = "loading...",
+		size = UDim2.fromOffset(200, 44),
+		position = UDim2.fromOffset(16, 16),
+		color = Color3.fromRGB(255, 214, 66),
+	})
+	self.coins.Parent = gui
 
-	-- Multiplier badge, hidden until the pass is owned
-	local badge = Instance.new("TextLabel")
-	badge.Name = "Multiplier"
-	badge.Size = UDim2.fromOffset(110, 32)
-	badge.Position = UDim2.fromOffset(16, 80)
-	badge.BackgroundColor3 = Color3.fromRGB(46, 120, 60)
-	badge.BorderSizePixel = 0
-	badge.Text = "2x ACTIVE"
-	badge.TextScaled = true
-	badge.Font = Enum.Font.GothamBold
-	badge.TextColor3 = Color3.new(1, 1, 1)
-	badge.Visible = false
-	corner(badge, 8)
-	badge.Parent = gui
-	self.badge = badge
+	self.level = label({
+		text = "",
+		size = UDim2.fromOffset(200, 32),
+		position = UDim2.fromOffset(16, 66),
+		color = Color3.fromRGB(180, 210, 255),
+	})
+	self.level.Parent = gui
 
-	-- Main click button
-	self.clickButton = button(
-		"CLICK",
-		Color3.fromRGB(232, 172, 32),
-		UDim2.fromOffset(200, 90),
-		UDim2.new(0.5, -100, 1, -130)
+	-- ---------- top-centre: run status ----------
+	self.waveLabel = label({
+		text = "",
+		size = UDim2.fromOffset(240, 44),
+		position = UDim2.new(0.5, -120, 0, 16),
+		color = Color3.fromRGB(255, 255, 255),
+	})
+	self.waveLabel.Parent = gui
+
+	self.phaseLabel = label({
+		text = "",
+		size = UDim2.fromOffset(240, 30),
+		position = UDim2.new(0.5, -120, 0, 66),
+		color = Color3.fromRGB(200, 220, 255),
+	})
+	self.phaseLabel.Parent = gui
+
+	self.healthLabel = label({
+		text = "",
+		size = UDim2.fromOffset(200, 40),
+		position = UDim2.new(0.5, -100, 0, 104),
+		color = Color3.fromRGB(255, 140, 140),
+	})
+	self.healthLabel.Parent = gui
+
+	-- ---------- top-right: cash + curses ----------
+	self.cash = label({
+		text = "",
+		size = UDim2.fromOffset(200, 44),
+		position = UDim2.new(1, -216, 0, 16),
+		color = Color3.fromRGB(140, 240, 160),
+	})
+	self.cash.Parent = gui
+
+	self.curseLabel = label({
+		text = "",
+		size = UDim2.fromOffset(200, 34),
+		position = UDim2.new(1, -216, 0, 66),
+		color = Color3.fromRGB(220, 150, 255),
+	})
+	self.curseLabel.Parent = gui
+
+	-- ---------- centre: start / skip ----------
+	self.startButton = button(
+		"START RUN",
+		Color3.fromRGB(60, 150, 90),
+		UDim2.fromOffset(260, 70),
+		UDim2.new(0.5, -130, 0.5, -35)
 	)
-	self.clickButton.Parent = gui
+	self.startButton.Parent = gui
 
-	-- Shop
+	self.skipButton = button(
+		"START WAVE",
+		Color3.fromRGB(200, 140, 40),
+		UDim2.fromOffset(200, 46),
+		UDim2.new(0.5, -100, 0, 152)
+	)
+	self.skipButton.Visible = false
+	self.skipButton.Parent = gui
+
+	-- ---------- bottom: tower bar ----------
+	local bar = Instance.new("Frame")
+	bar.Name = "TowerBar"
+	bar.Size = UDim2.fromOffset(560, 84)
+	bar.Position = UDim2.new(0.5, -280, 1, -100)
+	bar.BackgroundTransparency = 1
+	bar.Parent = gui
+	self.towerBar = bar
+
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.Padding = UDim.new(0, 8)
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.Parent = bar
+
+	self.towerButtons = {}
+	for _, towerType in Config.TowerOrder do
+		local def = Config.Towers[towerType]
+		local b = button(
+			string.format("%s\n%d", def.displayName, def.cost),
+			def.color,
+			UDim2.fromOffset(126, 80),
+			UDim2.fromOffset(0, 0)
+		)
+		b.Parent = bar
+		self.towerButtons[towerType] = b
+	end
+
+	-- ---------- selected placed tower ----------
+	local towerPanel = Instance.new("Frame")
+	towerPanel.Name = "TowerPanel"
+	towerPanel.Size = UDim2.fromOffset(220, 110)
+	towerPanel.Position = UDim2.new(1, -236, 1, -230)
+	towerPanel.BackgroundColor3 = Color3.fromRGB(22, 24, 30)
+	towerPanel.BackgroundTransparency = 0.1
+	towerPanel.BorderSizePixel = 0
+	towerPanel.Visible = false
+	corner(towerPanel, 10)
+	towerPanel.Parent = gui
+	self.towerPanel = towerPanel
+
+	self.upgradeButton = button(
+		"Upgrade",
+		Color3.fromRGB(70, 130, 200),
+		UDim2.new(1, -20, 0, 40),
+		UDim2.fromOffset(10, 10)
+	)
+	self.upgradeButton.Parent = towerPanel
+
+	self.sellButton = button(
+		"Sell",
+		Color3.fromRGB(150, 70, 70),
+		UDim2.new(1, -20, 0, 40),
+		UDim2.fromOffset(10, 58)
+	)
+	self.sellButton.Parent = towerPanel
+
+	-- ---------- the hook: curse prompt ----------
+	local cursePanel = Instance.new("Frame")
+	cursePanel.Name = "CursePrompt"
+	cursePanel.Size = UDim2.fromOffset(520, 260)
+	cursePanel.Position = UDim2.new(0.5, -260, 0.5, -130)
+	cursePanel.BackgroundColor3 = Color3.fromRGB(28, 18, 34)
+	cursePanel.BackgroundTransparency = 0.05
+	cursePanel.BorderSizePixel = 0
+	cursePanel.Visible = false
+	corner(cursePanel, 14)
+	cursePanel.Parent = gui
+	self.cursePanel = cursePanel
+
+	local title = label({
+		text = "PUSH YOUR LUCK?",
+		size = UDim2.new(1, -20, 0, 44),
+		position = UDim2.fromOffset(10, 12),
+		bg = Color3.fromRGB(0, 0, 0),
+		transparency = 1,
+		color = Color3.fromRGB(230, 170, 255),
+	})
+	title.Parent = cursePanel
+
+	self.curseTimer = label({
+		text = "",
+		size = UDim2.new(1, -20, 0, 24),
+		position = UDim2.fromOffset(10, 58),
+		bg = Color3.fromRGB(0, 0, 0),
+		transparency = 1,
+		color = Color3.fromRGB(180, 180, 200),
+	})
+	self.curseTimer.Parent = cursePanel
+
+	self.curseButtons = {}
+	for i = 1, 2 do
+		local b = button(
+			"",
+			Color3.fromRGB(120, 60, 150),
+			UDim2.new(0.5, -18, 0, 86),
+			UDim2.fromOffset(12 + (i - 1) * (260 - 6), 90)
+		)
+		b.Parent = cursePanel
+		self.curseButtons[i] = b
+	end
+
+	self.bankButton = button(
+		"BANK IT — play it safe",
+		Color3.fromRGB(60, 140, 90),
+		UDim2.new(1, -24, 0, 48),
+		UDim2.fromOffset(12, 190)
+	)
+	self.bankButton.Parent = cursePanel
+
+	-- ---------- shop ----------
 	self.shopToggle = button(
 		"SHOP",
 		Color3.fromRGB(58, 92, 190),
-		UDim2.fromOffset(120, 48),
-		UDim2.new(1, -136, 0, 16)
+		UDim2.fromOffset(110, 40),
+		UDim2.new(1, -126, 0, 110)
 	)
 	self.shopToggle.Parent = gui
 
-	local panel = Instance.new("Frame")
-	panel.Name = "ShopPanel"
-	panel.Size = UDim2.fromOffset(300, 230)
-	panel.Position = UDim2.new(1, -316, 0, 76)
-	panel.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
-	panel.BackgroundTransparency = 0.08
-	panel.BorderSizePixel = 0
-	panel.Visible = false
-	corner(panel, 12)
-	panel.Parent = gui
-	self.panel = panel
+	local shop = Instance.new("Frame")
+	shop.Name = "Shop"
+	shop.Size = UDim2.fromOffset(300, 320)
+	shop.Position = UDim2.new(1, -316, 0, 158)
+	shop.BackgroundColor3 = Color3.fromRGB(22, 24, 30)
+	shop.BackgroundTransparency = 0.08
+	shop.BorderSizePixel = 0
+	shop.Visible = false
+	corner(shop, 12)
+	shop.Parent = gui
+	self.shop = shop
 
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -20, 0, 34)
-	title.Position = UDim2.fromOffset(10, 10)
-	title.BackgroundTransparency = 1
-	title.Text = "Shop"
-	title.TextScaled = true
-	title.Font = Enum.Font.GothamBold
-	title.TextColor3 = Color3.new(1, 1, 1)
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Parent = panel
-
-	self.buyPass = button(
-		"2x Coins (Pass)",
-		Color3.fromRGB(46, 120, 60),
-		UDim2.new(1, -20, 0, 50),
-		UDim2.fromOffset(10, 52)
+	self.passStarterCash = button(
+		"Starter Cash",
+		Color3.fromRGB(150, 90, 60),
+		UDim2.new(1, -20, 0, 42),
+		UDim2.fromOffset(10, 12)
 	)
-	self.buyPass.Parent = panel
-
-	self.buy100 = button(
-		"+100 Coins",
-		Color3.fromRGB(58, 92, 190),
-		UDim2.new(1, -20, 0, 50),
+	self.passStarterCash.Parent = shop
+	self.passLuckyCurse = button(
+		"Lucky Curse",
+		Color3.fromRGB(150, 90, 60),
+		UDim2.new(1, -20, 0, 42),
+		UDim2.fromOffset(10, 62)
+	)
+	self.passLuckyCurse.Parent = shop
+	self.passSecondChance = button(
+		"Second Chance",
+		Color3.fromRGB(150, 90, 60),
+		UDim2.new(1, -20, 0, 42),
 		UDim2.fromOffset(10, 112)
 	)
-	self.buy100.Parent = panel
-
-	self.buy500 = button(
-		"+500 Coins",
+	self.passSecondChance.Parent = shop
+	self.buyCoins = button(
+		"Coin Pack",
 		Color3.fromRGB(58, 92, 190),
-		UDim2.new(1, -20, 0, 50),
-		UDim2.fromOffset(10, 172)
+		UDim2.new(1, -20, 0, 42),
+		UDim2.fromOffset(10, 174)
 	)
-	self.buy500.Parent = panel
+	self.buyCoins.Parent = shop
+	self.buyInstantWave = button(
+		"Instant Wave",
+		Color3.fromRGB(58, 92, 190),
+		UDim2.new(1, -20, 0, 42),
+		UDim2.fromOffset(10, 224)
+	)
+	self.buyInstantWave.Parent = shop
+	self.buyRevive = button(
+		"Revive",
+		Color3.fromRGB(58, 92, 190),
+		UDim2.new(1, -20, 0, 42),
+		UDim2.fromOffset(10, 274)
+	)
+	self.buyRevive.Parent = shop
 
 	self.shopToggle.Activated:Connect(function()
-		panel.Visible = not panel.Visible
+		shop.Visible = not shop.Visible
 	end)
+
+	-- ---------- toasts ----------
+	local toasts = Instance.new("Frame")
+	toasts.Name = "Toasts"
+	toasts.Size = UDim2.fromOffset(320, 200)
+	toasts.Position = UDim2.new(0, 16, 1, -320)
+	toasts.BackgroundTransparency = 1
+	toasts.Parent = gui
+
+	local tl = Instance.new("UIListLayout")
+	tl.SortOrder = Enum.SortOrder.LayoutOrder
+	tl.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	tl.Padding = UDim.new(0, 4)
+	tl.Parent = toasts
+	self.toasts = toasts
 
 	return self
 end
 
-function HUD:render(state: { coins: number, multiplier: number, ownsDoubleCoins: boolean }?)
+function HUD:toast(text: string, color: Color3)
+	self.toastCounter += 1
+	local l = Instance.new("TextLabel")
+	l.Size = UDim2.new(1, 0, 0, 32)
+	l.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
+	l.BackgroundTransparency = 0.2
+	l.BorderSizePixel = 0
+	l.Text = text
+	l.TextScaled = true
+	l.Font = Enum.Font.GothamBold
+	l.TextColor3 = color
+	l.LayoutOrder = self.toastCounter
+	corner(l, 6)
+	l.Parent = self.toasts
+	task.delay(4, function()
+		if l.Parent then
+			l:Destroy()
+		end
+	end)
+end
+
+function HUD:render(state)
 	if not state then
-		self.counter.Text = "loading..."
+		self.coins.Text = "loading..."
 		return
 	end
-	self.counter.Text = string.format("%d coins", state.coins)
-	self.badge.Visible = state.ownsDoubleCoins
-	self.buyPass.Visible = not state.ownsDoubleCoins
+	self.state = state
+
+	self.coins.Text = string.format("%d coins", state.coins)
+	self.level.Text = string.format("Level %d", state.level)
+
+	local inRun = state.inRun
+	self.startButton.Visible = not inRun
+	self.towerBar.Visible = inRun
+	self.waveLabel.Visible = inRun
+	self.phaseLabel.Visible = inRun
+	self.healthLabel.Visible = inRun
+	self.cash.Visible = inRun
+	self.curseLabel.Visible = inRun
+
+	if not inRun then
+		self.skipButton.Visible = false
+		self.cursePanel.Visible = false
+		self.towerPanel.Visible = false
+		return
+	end
+
+	self.waveLabel.Text = string.format("Wave %d", state.wave)
+	self.healthLabel.Text = string.format("Base  %d / %d", state.baseHealth, state.maxBaseHealth)
+	self.cash.Text = string.format("$%d", state.cash)
+
+	if state.payoutMultiplier > 1 then
+		self.curseLabel.Text =
+			string.format("%d curses  ·  x%.1f", #state.curses, state.payoutMultiplier)
+	else
+		self.curseLabel.Text = "no curses"
+	end
+
+	local remaining = math.max(0, math.floor(state.phaseEndsAt - os.clock()))
+	if state.phase == "build" then
+		self.phaseLabel.Text = string.format("Build  %ds", remaining)
+		self.skipButton.Visible = true
+	elseif state.phase == "wave" then
+		self.phaseLabel.Text = "Wave incoming"
+		self.skipButton.Visible = false
+	else
+		self.phaseLabel.Text = ""
+		self.skipButton.Visible = false
+	end
+
+	-- Tower buttons reflect unlocks and affordability, but the server checks
+	-- both again — hiding a button is not a permission check.
+	for towerType, b in self.towerButtons do
+		local def = Config.Towers[towerType]
+		local unlocked = false
+		for _, id in state.unlockedTowers do
+			if id == towerType then
+				unlocked = true
+				break
+			end
+		end
+		b.Visible = unlocked
+		local affordable = state.cash >= def.cost
+		b.BackgroundTransparency = if affordable then 0 else 0.6
+		b.Text = string.format(
+			"%s\n%d%s",
+			def.displayName,
+			def.cost,
+			if self.selectedTower == towerType then "  ✓" else ""
+		)
+	end
+
+	-- The curse prompt.
+	if state.phase == "choosing" and #state.curseOffers > 0 then
+		self.cursePanel.Visible = true
+		self.curseTimer.Text = string.format("banking automatically in %ds", remaining)
+		for i, b in self.curseButtons do
+			local offer = state.curseOffers[i]
+			if offer then
+				b.Visible = true
+				b.Text = string.format(
+					"%s\n%s\n\nx%.1f payout",
+					offer.displayName,
+					offer.description,
+					offer.payout
+				)
+				b:SetAttribute("CurseId", offer.id)
+			else
+				b.Visible = false
+			end
+		end
+	else
+		self.cursePanel.Visible = false
+	end
+
+	-- Selected placed tower.
+	local selected = nil
+	if self.selectedPlacedTower then
+		for _, view in state.towers do
+			if view.id == self.selectedPlacedTower then
+				selected = view
+				break
+			end
+		end
+	end
+	if selected then
+		self.towerPanel.Visible = true
+		self.upgradeButton.Text = if selected.upgradeCost
+			then string.format("Upgrade  $%d", selected.upgradeCost)
+			else "Max tier"
+		self.upgradeButton.BackgroundTransparency = if selected.upgradeCost then 0 else 0.6
+		self.sellButton.Text = string.format("Sell  +$%d", selected.sellValue)
+	else
+		self.towerPanel.Visible = false
+		self.selectedPlacedTower = nil
+	end
+
+	local passes = state.passes or {}
+	self.passStarterCash.Text = passes.starterCash and "Starter Cash ✓" or "Starter Cash"
+	self.passLuckyCurse.Text = passes.luckyCurse and "Lucky Curse ✓" or "Lucky Curse"
+	self.passSecondChance.Text = passes.secondChance and "Second Chance ✓" or "Second Chance"
 end
 
 return HUD
