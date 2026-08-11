@@ -12,6 +12,7 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Audio = require(ReplicatedStorage.Shared.Audio)
 local Config = require(ReplicatedStorage.Shared.Config)
 
 local Effects = require(script.Parent.Effects)
@@ -170,6 +171,10 @@ function EnemyService.damage(
 		-- after, and a burst at the origin would look like a bug.
 		if model then
 			Effects.burst(model.Position, def.color, def.size / 2.5)
+			Audio.playAt(
+				if enemy.enemyType == "boss" then "bossDeath" else "enemyDeath",
+				model.Position
+			)
 		end
 		EnemyService.remove(player, enemyId)
 		EnemyService.Killed:Fire(player, enemy)

@@ -314,6 +314,44 @@ Config.Curses = {
 }
 
 -- ============================================================
+-- Sound
+--
+-- IDs are filled in from the Creator Store once picked. Everything is wired and
+-- called already; an empty id is skipped silently, so the game is fully playable
+-- while these are blank and gains audio the moment they are set — no code change.
+--
+-- Format: "rbxassetid://123456789"
+-- ============================================================
+
+Config.Sounds = {
+	-- Combat
+	towerFire = { id = "", volume = 0.25, pitchRange = { 0.92, 1.08 } },
+	towerFireHeavy = { id = "", volume = 0.35, pitchRange = { 0.9, 1.05 } },
+	enemyDeath = { id = "", volume = 0.3, pitchRange = { 0.9, 1.15 } },
+	bossDeath = { id = "", volume = 0.6, pitchRange = { 0.95, 1.05 } },
+
+	-- Stakes
+	leak = { id = "", volume = 0.6, pitchRange = { 0.95, 1.05 } },
+	defeat = { id = "", volume = 0.7, pitchRange = { 1, 1 } },
+	victory = { id = "", volume = 0.7, pitchRange = { 1, 1 } },
+
+	-- Interface
+	place = { id = "", volume = 0.4, pitchRange = { 0.97, 1.03 } },
+	upgrade = { id = "", volume = 0.45, pitchRange = { 1, 1 } },
+	sell = { id = "", volume = 0.35, pitchRange = { 1, 1 } },
+	click = { id = "", volume = 0.3, pitchRange = { 1, 1 } },
+
+	-- The hook. These two carry the emotional weight of the whole game and
+	-- deserve the most distinctive sounds in the set.
+	curseTaken = { id = "", volume = 0.7, pitchRange = { 1, 1 } },
+	bank = { id = "", volume = 0.5, pitchRange = { 1, 1 } },
+
+	waveStart = { id = "", volume = 0.5, pitchRange = { 1, 1 } },
+	waveCleared = { id = "", volume = 0.5, pitchRange = { 1, 1 } },
+	levelUp = { id = "", volume = 0.6, pitchRange = { 1, 1 } },
+}
+
+-- ============================================================
 -- Progression
 -- ============================================================
 

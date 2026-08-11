@@ -8,6 +8,7 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Audio = require(ReplicatedStorage.Shared.Audio)
 local Config = require(ReplicatedStorage.Shared.Config)
 
 local Effects = require(script.Parent.Effects)
@@ -256,6 +257,12 @@ function TowerService.step(player: Player, _dt: number)
 							targetModel.Position,
 							def.color,
 							if stats.splashRadius > 0 then 1.2 else 0.55
+						)
+						Audio.playAt(
+							if stats.splashRadius > 0 or stats.damage > 40
+								then "towerFireHeavy"
+								else "towerFire",
+							from
 						)
 					end
 

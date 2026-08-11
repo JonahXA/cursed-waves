@@ -324,6 +324,32 @@ function HUD.new()
 		shop.Visible = not shop.Visible
 	end)
 
+	--[[
+		Onboarding hint.
+
+		A single contextual line rather than a tutorial sequence. New players do
+		not read modals, and a game that opens with a wall of instructions loses
+		them before the first action. This says exactly one thing, always the
+		next thing, and disappears once they clearly know what they are doing.
+
+		Time-to-first-action is the pattern every breakout game on the platform
+		shares, and this is what protects it.
+	]]
+	self.hint = Instance.new("TextLabel")
+	self.hint.Name = "Hint"
+	self.hint.Size = UDim2.fromOffset(620, 46)
+	self.hint.Position = UDim2.new(0.5, -310, 1, -170)
+	self.hint.BackgroundColor3 = Color3.fromRGB(18, 20, 26)
+	self.hint.BackgroundTransparency = 0.15
+	self.hint.BorderSizePixel = 0
+	self.hint.Text = ""
+	self.hint.TextScaled = true
+	self.hint.Font = Enum.Font.GothamBold
+	self.hint.TextColor3 = Color3.fromRGB(255, 226, 150)
+	self.hint.Visible = false
+	corner(self.hint, 10)
+	self.hint.Parent = gui
+
 	-- ---------- toasts ----------
 	local toasts = Instance.new("Frame")
 	toasts.Name = "Toasts"
@@ -386,7 +412,29 @@ function HUD:render(state)
 		self.skipButton.Visible = false
 		self.cursePanel.Visible = false
 		self.towerPanel.Visible = false
+		self.hint.Visible = state.level <= 1 and (state.coins or 0) == 0
+		self.hint.Text = "Press START RUN to defend your base"
 		return
+	end
+
+	--[[
+		One hint, always the next thing, and it stops once the player has clearly
+		understood. Hints keyed off actual state rather than a step counter, so
+		a player who works something out early is never told to do it.
+	]]
+	local hint = nil
+	if state.phase == "build" and #state.towers == 0 then
+		hint = "Pick a tower below, then click the grass to place it"
+	elseif state.phase == "build" and state.wave == 0 then
+		hint = "Place more, or press START WAVE when you're ready"
+	elseif state.phase == "wave" and state.wave <= 1 then
+		hint = "Towers fire on their own — don't let anything reach the base"
+	elseif state.phase == "choosing" and #state.curses == 0 then
+		hint = "Take a curse for a bigger payout, or bank it and stay safe"
+	end
+	self.hint.Visible = hint ~= nil
+	if hint then
+		self.hint.Text = hint
 	end
 
 	self.waveLabel.Text = string.format("Wave %d", state.wave)

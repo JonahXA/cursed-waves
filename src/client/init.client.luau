@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
+local Audio = require(ReplicatedStorage.Shared.Audio)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local CameraController = require(script.CameraController)
 local HUD = require(script.HUD)
@@ -61,23 +62,29 @@ runEventRemote.OnClientEvent:Connect(function(payload)
 	end
 	if payload.kind == "waveStarted" then
 		hud:toast(string.format("Wave %d incoming", payload.wave), WHITE)
+		Audio.play("waveStart")
 	elseif payload.kind == "waveCleared" then
 		hud:toast(string.format("Wave %d cleared  +$%d", payload.wave, payload.bonus), GREEN)
+		Audio.play("waveCleared")
 	elseif payload.kind == "leak" then
 		hud:toast(string.format("Leak! -%d base", payload.damage), RED)
 		CameraController.shake(math.min(payload.damage, 6))
+		Audio.play("leak")
 	elseif payload.kind == "curseTaken" then
 		hud:toast(string.format("%s accepted", payload.displayName), PURPLE)
+		Audio.play("curseTaken")
 	elseif payload.kind == "revived" then
 		hud:toast("Second Chance saved your base", GOLD)
 	elseif payload.kind == "levelUp" then
 		hud:toast(string.format("Level %d!", payload.level), GOLD)
+		Audio.play("levelUp")
 	elseif payload.kind == "runEnded" then
 		local verb = if payload.reason == "victory" then "Victory" else "Defeated"
 		hud:toast(
 			string.format("%s on wave %d  ·  +%d coins", verb, payload.wave, payload.coins),
 			if payload.reason == "victory" then GOLD else RED
 		)
+		Audio.play(if payload.reason == "victory" then "victory" else "defeat")
 	end
 end)
 
@@ -126,6 +133,7 @@ end
 
 hud.bankButton.Activated:Connect(function()
 	chooseCurse:FireServer(nil)
+	Audio.play("bank")
 end)
 
 hud.passStarterCash.Activated:Connect(function()
