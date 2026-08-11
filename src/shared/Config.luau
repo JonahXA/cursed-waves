@@ -323,32 +323,94 @@ Config.Curses = {
 -- Format: "rbxassetid://123456789"
 -- ============================================================
 
+-- Sources are deliberately limited to ProSoundEffects and APMOfficial — both are
+-- professionally produced, properly licensed libraries. The Creator Store's free
+-- audio is otherwise dominated by user re-uploads of copyrighted material
+-- (recognisable anime and game clips under meme names), which is a moderation
+-- risk in a published experience and not worth taking for a sound effect.
+--
+-- CAVEAT: these were chosen by reading descriptions. Claude cannot hear audio.
+-- They are plausible, licensed and correctly wired, but they have never been
+-- listened to — treat them as placeholders pending a human pass.
+Config.Sounds = {
+-- `maxDuration` trims a clip at playback. Source lengths were measured in Studio
+-- (4.00s, 2.59s, 1.26s, 1.33s, 1.08s, 0.86s, 2.71s) and several are far longer
+-- than the moment they mark — a Pea firing 1.2 times a second against a 4-second
+-- sample would stack five copies deep and become noise.
 Config.Sounds = {
 	-- Combat
-	towerFire = { id = "", volume = 0.25, pitchRange = { 0.92, 1.08 } },
-	towerFireHeavy = { id = "", volume = 0.35, pitchRange = { 0.9, 1.05 } },
-	enemyDeath = { id = "", volume = 0.3, pitchRange = { 0.9, 1.15 } },
-	bossDeath = { id = "", volume = 0.6, pitchRange = { 0.95, 1.05 } },
+	towerFire = {
+		id = "rbxassetid://1837834196",
+		volume = 0.16,
+		pitchRange = { 1.5, 1.75 },
+		maxDuration = 0.18,
+	},
+	towerFireHeavy = {
+		id = "rbxassetid://9125672726",
+		volume = 0.26,
+		pitchRange = { 1.1, 1.25 },
+		maxDuration = 0.4,
+	},
+	enemyDeath = {
+		id = "rbxassetid://9125869797",
+		volume = 0.24,
+		pitchRange = { 1.0, 1.3 },
+		maxDuration = 0.5,
+	},
+	bossDeath = { id = "rbxassetid://9125869504", volume = 0.55, pitchRange = { 0.8, 0.9 } },
 
 	-- Stakes
-	leak = { id = "", volume = 0.6, pitchRange = { 0.95, 1.05 } },
-	defeat = { id = "", volume = 0.7, pitchRange = { 1, 1 } },
-	victory = { id = "", volume = 0.7, pitchRange = { 1, 1 } },
+	leak = { id = "rbxassetid://9113225986", volume = 0.55, pitchRange = { 0.9, 1.0 } },
+	defeat = { id = "rbxassetid://9125869504", volume = 0.65, pitchRange = { 0.7, 0.75 } },
+	victory = { id = "rbxassetid://1842481856", volume = 0.6, pitchRange = { 1.2, 1.2 } },
 
-	-- Interface
-	place = { id = "", volume = 0.4, pitchRange = { 0.97, 1.03 } },
-	upgrade = { id = "", volume = 0.45, pitchRange = { 1, 1 } },
-	sell = { id = "", volume = 0.35, pitchRange = { 1, 1 } },
-	click = { id = "", volume = 0.3, pitchRange = { 1, 1 } },
+	-- Interface. All from the same 4s swipe, pitched and trimmed differently —
+	-- one source doing four jobs is fine for UI, where the ear reads pitch and
+	-- length far more than timbre.
+	place = {
+		id = "rbxassetid://1837834196",
+		volume = 0.3,
+		pitchRange = { 1.1, 1.2 },
+		maxDuration = 0.3,
+	},
+	upgrade = {
+		id = "rbxassetid://1837834196",
+		volume = 0.34,
+		pitchRange = { 1.4, 1.45 },
+		maxDuration = 0.35,
+	},
+	sell = {
+		id = "rbxassetid://1837834196",
+		volume = 0.26,
+		pitchRange = { 0.8, 0.85 },
+		maxDuration = 0.3,
+	},
+	click = {
+		id = "rbxassetid://1837834196",
+		volume = 0.2,
+		pitchRange = { 1.7, 1.8 },
+		maxDuration = 0.14,
+	},
 
 	-- The hook. These two carry the emotional weight of the whole game and
-	-- deserve the most distinctive sounds in the set.
-	curseTaken = { id = "", volume = 0.7, pitchRange = { 1, 1 } },
-	bank = { id = "", volume = 0.5, pitchRange = { 1, 1 } },
+	-- deserve the most distinctive sounds in the set — the current picks are the
+	-- weakest link in the audio pass and should be replaced first.
+	curseTaken = { id = "rbxassetid://9119421599", volume = 0.6, pitchRange = { 0.7, 0.75 } },
+	bank = {
+		id = "rbxassetid://1837834196",
+		volume = 0.4,
+		pitchRange = { 0.95, 1.0 },
+		maxDuration = 0.45,
+	},
 
-	waveStart = { id = "", volume = 0.5, pitchRange = { 1, 1 } },
-	waveCleared = { id = "", volume = 0.5, pitchRange = { 1, 1 } },
-	levelUp = { id = "", volume = 0.6, pitchRange = { 1, 1 } },
+	waveStart = { id = "rbxassetid://1842481856", volume = 0.45, pitchRange = { 0.9, 0.95 } },
+	waveCleared = {
+		id = "rbxassetid://1837834196",
+		volume = 0.4,
+		pitchRange = { 1.3, 1.35 },
+		maxDuration = 0.6,
+	},
+	levelUp = { id = "rbxassetid://1842481856", volume = 0.55, pitchRange = { 1.35, 1.4 } },
 }
 
 -- ============================================================

@@ -44,6 +44,27 @@ local function configure(sound: Sound, def)
 	end
 end
 
+--[[
+	Stops a sound early when the source clip is longer than the moment it marks.
+
+	This matters more than it sounds. The library clips available are 1–4 seconds,
+	while a Pea tower fires up to 1.2 times a second — so a 4-second sample would
+	stack five copies deep and turn into noise. Trimming at playback keeps a long
+	clip usable as a short effect without needing a differently-edited asset for
+	every use.
+]]
+local function trim(sound: Sound, def)
+	local limit = def.maxDuration
+	if not limit then
+		return
+	end
+	task.delay(limit, function()
+		if sound and sound.Parent then
+			sound:Stop()
+		end
+	end)
+end
+
 --[[ A positional sound at a world point. Server-side so it replicates. ]]
 function Audio.playAt(name: string, position: Vector3, parent: Instance?)
 	local def = definition(name)
@@ -65,6 +86,7 @@ function Audio.playAt(name: string, position: Vector3, parent: Instance?)
 	sound.RollOffMaxDistance = 220
 	sound.Parent = anchor
 	sound:Play()
+	trim(sound, def)
 
 	Debris:AddItem(anchor, 6)
 end
@@ -80,6 +102,7 @@ function Audio.play(name: string)
 	configure(sound, def)
 	sound.Parent = SoundService
 	sound:Play()
+	trim(sound, def)
 
 	Debris:AddItem(sound, 8)
 end
