@@ -16,10 +16,16 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local CameraController = require(script.CameraController)
 local HUD = require(script.HUD)
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
+
+-- Before the HUD. A strategic camera is the single biggest reason this reads as
+-- a game rather than a baseplate, and it also makes accurate tower placement
+-- possible at all.
+CameraController.start()
 
 local startRun = Remotes.get("StartRun") :: RemoteEvent
 local placeTower = Remotes.get("PlaceTower") :: RemoteEvent
@@ -59,6 +65,7 @@ runEventRemote.OnClientEvent:Connect(function(payload)
 		hud:toast(string.format("Wave %d cleared  +$%d", payload.wave, payload.bonus), GREEN)
 	elseif payload.kind == "leak" then
 		hud:toast(string.format("Leak! -%d base", payload.damage), RED)
+		CameraController.shake(math.min(payload.damage, 6))
 	elseif payload.kind == "curseTaken" then
 		hud:toast(string.format("%s accepted", payload.displayName), PURPLE)
 	elseif payload.kind == "revived" then

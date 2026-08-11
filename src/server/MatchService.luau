@@ -22,6 +22,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
+local Effects = require(script.Parent.Effects)
 local EnemyService = require(script.Parent.EnemyService)
 local MapService = require(script.Parent.MapService)
 local MonetizationService = require(script.Parent.MonetizationService)
@@ -618,6 +619,19 @@ function MatchService.start()
 		local damage = math.ceil(def.damageToBase * effects.baseDamageMultiplier)
 
 		run.baseHealth -= damage
+
+		-- A leak is the only thing in the game that actively costs the player.
+		-- It should be impossible to miss.
+		local map = MapService.get(player)
+		if map then
+			Effects.shockwave(map.basePosition + Vector3.new(0, 2, 0), Color3.fromRGB(255, 80, 80))
+			Effects.popup(
+				map.basePosition + Vector3.new(0, 12, 0),
+				string.format("-%d", damage),
+				Color3.fromRGB(255, 90, 90)
+			)
+		end
+
 		fireEvent(player, { kind = "leak", damage = damage, baseHealth = run.baseHealth })
 
 		if run.baseHealth <= 0 then

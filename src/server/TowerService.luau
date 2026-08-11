@@ -10,6 +10,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 
+local Effects = require(script.Parent.Effects)
 local EnemyService = require(script.Parent.EnemyService)
 local MapService = require(script.Parent.MapService)
 local RunState = require(script.Parent.RunState)
@@ -104,6 +105,12 @@ local function refreshModel(player: Player, tower: any)
 	local model = buildModel(player, tower)
 	if model then
 		models[tower.id] = model
+		-- Placing something should feel like an action, not an appearance.
+		for _, part in model:GetChildren() do
+			if part:IsA("BasePart") then
+				Effects.placePop(part)
+			end
+		end
 	end
 end
 
@@ -231,14 +238,25 @@ function TowerService.step(player: Player, _dt: number)
 				if target then
 					tower.lastFired = now
 
-					-- Aim the head so firing reads visually even without projectiles.
+					local def = Config.Towers[tower.towerType]
 					local model = models[tower.id]
 					local targetModel = EnemyService.modelOf(target.id)
+
 					if model and model.PrimaryPart and targetModel then
 						local from = model.PrimaryPart.Position
 						local look =
 							Vector3.new(targetModel.Position.X, from.Y, targetModel.Position.Z)
 						model.PrimaryPart.CFrame = CFrame.lookAt(from, look)
+
+						-- The shot itself. Without this, combat is invisible:
+						-- towers deal damage and enemies silently lose health,
+						-- which makes a working game read as a broken one.
+						Effects.tracer(
+							from,
+							targetModel.Position,
+							def.color,
+							if stats.splashRadius > 0 then 1.2 else 0.55
+						)
 					end
 
 					if stats.slowFactor > 0 then
@@ -246,6 +264,13 @@ function TowerService.step(player: Player, _dt: number)
 					end
 
 					if stats.damage > 0 then
+						if targetModel then
+							Effects.popup(
+								targetModel.Position + Vector3.new(0, 2, 0),
+								tostring(math.floor(stats.damage)),
+								def.color
+							)
+						end
 						EnemyService.damage(player, target.id, stats.damage, stats.ignoresArmour)
 
 						if stats.splashRadius > 0 and targetModel then

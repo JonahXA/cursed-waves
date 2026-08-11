@@ -14,6 +14,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 
+local Effects = require(script.Parent.Effects)
 local MapService = require(script.Parent.MapService)
 local RunState = require(script.Parent.RunState)
 
@@ -165,6 +166,11 @@ function EnemyService.damage(
 	end
 
 	if enemy.health <= 0 then
+		-- Capture the position before removal — the model is gone immediately
+		-- after, and a burst at the origin would look like a bug.
+		if model then
+			Effects.burst(model.Position, def.color, def.size / 2.5)
+		end
 		EnemyService.remove(player, enemyId)
 		EnemyService.Killed:Fire(player, enemy)
 		return true

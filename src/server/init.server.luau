@@ -23,6 +23,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
+local Ambience = require(script.Ambience)
 local DataService = require(script.DataService)
 local EconomyService = require(script.EconomyService)
 local MatchService = require(script.MatchService)
@@ -30,6 +31,10 @@ local MonetizationService = require(script.MonetizationService)
 local Telemetry = require(script.Telemetry)
 
 Remotes.init()
+
+-- Before anything else visual. Roblox's default lighting reads as "unfinished
+-- baseplate", and no amount of geometry recovers from that first impression.
+Ambience.apply()
 
 DataService.start()
 EconomyService.start()
