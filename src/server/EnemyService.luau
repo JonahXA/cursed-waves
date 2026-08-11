@@ -39,15 +39,42 @@ local function buildModel(player: Player, enemy: any, position: Vector3): BasePa
 	end
 	local def = enemyConfig(enemy.enemyType)
 
+	--[[
+		Silhouette carries the threat read.
+
+		A player scanning the lane from the strategic camera has no time to read
+		a label — they need to know at a glance that the big angular thing is
+		armoured and the small fast one is a Runner. Identical balls in different
+		colours would put that information nowhere.
+	]]
 	local part = Instance.new("Part")
 	part.Name = enemy.id
-	part.Shape = Enum.PartType.Ball
-	part.Size = Vector3.new(def.size, def.size, def.size)
 	part.Position = position
 	part.Anchored = true
 	part.CanCollide = false
 	part.Color = def.color
 	part.Material = Enum.Material.SmoothPlastic
+
+	if enemy.enemyType == "tank" then
+		part.Shape = Enum.PartType.Block
+		part.Size = Vector3.new(def.size, def.size * 0.9, def.size * 1.15)
+		part.Material = Enum.Material.DiamondPlate
+	elseif enemy.enemyType == "runner" then
+		part.Shape = Enum.PartType.Block
+		part.Size = Vector3.new(def.size * 0.6, def.size * 0.6, def.size * 1.9)
+	elseif enemy.enemyType == "boss" then
+		part.Shape = Enum.PartType.Ball
+		part.Size = Vector3.new(def.size, def.size, def.size)
+		part.Material = Enum.Material.Neon
+		local aura = Instance.new("PointLight")
+		aura.Color = def.color
+		aura.Brightness = 4
+		aura.Range = 40
+		aura.Parent = part
+	else
+		part.Shape = Enum.PartType.Ball
+		part.Size = Vector3.new(def.size, def.size, def.size)
+	end
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "HealthBar"

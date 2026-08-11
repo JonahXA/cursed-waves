@@ -65,33 +65,161 @@ function TowerService.upgradeCost(towerType: string, tier: number): number?
 	return next_ and next_.cost or nil
 end
 
+local function piece(model: Model, name: string, size: Vector3, cf: CFrame, color: Color3, material)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.CFrame = cf
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = true
+	p.Color = color
+	p.Material = material or Enum.Material.SmoothPlastic
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Parent = model
+	return p
+end
+
+--[[
+	Builds a tower.
+
+	Each type gets a distinct silhouette rather than a recoloured cube. From the
+	strategic camera a player cannot read labels — they identify towers by shape
+	at a glance, and four identical boxes in different colours is the single most
+	prototype-looking thing a tower defense can do.
+
+	Tier still changes only scale, emissive material and a rank marker, so
+	upgrading remains a stat transform on one model rather than three models per
+	tower.
+]]
 local function buildModel(player: Player, tower: any): Model?
 	local map = MapService.get(player)
 	if not map then
 		return nil
 	end
 	local def = Config.Towers[tower.towerType]
+	local tier = tower.tier
+	local origin = tower.position
 
 	local model = Instance.new("Model")
 	model.Name = tower.id
 
-	local base = Instance.new("Part")
-	base.Name = "Base"
-	base.Size = Vector3.new(5, 1, 5)
-	base.Position = tower.position
-	base.Anchored = true
-	base.Color = Color3.fromRGB(80, 80, 90)
-	base.Material = Enum.Material.Metal
-	base.Parent = model
+	local dark = Color3.fromRGB(58, 58, 68)
+	piece(
+		model,
+		"Pedestal",
+		Vector3.new(6, 1.4, 6),
+		CFrame.new(origin + Vector3.new(0, 0.7, 0)),
+		dark,
+		Enum.Material.Slate
+	)
+	piece(
+		model,
+		"Column",
+		Vector3.new(3.2, 2.6 + tier * 0.5, 3.2),
+		CFrame.new(origin + Vector3.new(0, 2.4 + tier * 0.25, 0)),
+		Color3.fromRGB(88, 88, 100),
+		Enum.Material.Metal
+	)
 
-	local head = Instance.new("Part")
-	head.Name = "Head"
-	head.Size = Vector3.new(3, 3 + tower.tier, 3)
-	head.Position = tower.position + Vector3.new(0, 2 + tower.tier * 0.5, 0)
-	head.Anchored = true
-	head.Color = def.color
-	head.Material = if tower.tier >= 2 then Enum.Material.Neon else Enum.Material.SmoothPlastic
-	head.Parent = model
+	local headY = 4.4 + tier * 0.5
+	local emissive = if tier >= 2 then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	local head
+
+	if tower.towerType == "sniper" then
+		-- Long thin barrel, unmistakable at distance.
+		head = piece(
+			model,
+			"Head",
+			Vector3.new(1.8, 1.8, 9 + tier),
+			CFrame.new(origin + Vector3.new(0, headY, 0)),
+			def.color,
+			emissive
+		)
+		piece(
+			model,
+			"Scope",
+			Vector3.new(1.1, 1.1, 2.4),
+			CFrame.new(origin + Vector3.new(0, headY + 1.4, 0)),
+			dark,
+			Enum.Material.Metal
+		)
+	elseif tower.towerType == "splash" then
+		-- Squat wide mortar, angled up.
+		head = piece(
+			model,
+			"Head",
+			Vector3.new(4.4, 3, 4.4),
+			CFrame.new(origin + Vector3.new(0, headY, 0)),
+			def.color,
+			emissive
+		)
+		piece(
+			model,
+			"Mouth",
+			Vector3.new(3.4, 3.4, 3.4),
+			CFrame.new(origin + Vector3.new(0, headY + 1.8, 0)) * CFrame.Angles(math.rad(-25), 0, 0),
+			def.color:Lerp(Color3.new(1, 1, 1), 0.25),
+			emissive
+		)
+	elseif tower.towerType == "frost" then
+		-- Crystal cluster: tall, irregular, obviously not a gun.
+		head = piece(
+			model,
+			"Head",
+			Vector3.new(2.4, 4.5 + tier * 0.6, 2.4),
+			CFrame.new(origin + Vector3.new(0, headY + 0.8, 0)) * CFrame.Angles(0, math.rad(35), 0),
+			def.color,
+			Enum.Material.Glass
+		)
+		for index, offset in { Vector3.new(1.5, -0.6, 0.6), Vector3.new(-1.3, -0.9, -1.1) } do
+			piece(
+				model,
+				"Shard" .. tostring(index),
+				Vector3.new(1.1, 2.6, 1.1),
+				CFrame.new(origin + Vector3.new(0, headY, 0) + offset)
+					* CFrame.Angles(math.rad(18), math.rad(index * 40), math.rad(-14)),
+				def.color,
+				Enum.Material.Glass
+			)
+		end
+		local glow = Instance.new("PointLight")
+		glow.Color = def.color
+		glow.Brightness = 1.4
+		glow.Range = 18
+		glow.Parent = head
+	else
+		-- Pea: compact turret with a stubby barrel.
+		head = piece(
+			model,
+			"Head",
+			Vector3.new(3.2, 2.6, 3.2),
+			CFrame.new(origin + Vector3.new(0, headY, 0)),
+			def.color,
+			emissive
+		)
+		piece(
+			model,
+			"Barrel",
+			Vector3.new(1.2, 1.2, 3.4),
+			CFrame.new(origin + Vector3.new(0, headY, 0)) * CFrame.new(0, 0, -2.2),
+			def.color:Lerp(Color3.new(0, 0, 0), 0.35),
+			Enum.Material.Metal
+		)
+	end
+
+	-- Rank pips, so tier is readable without selecting the tower.
+	for index = 1, tier do
+		piece(
+			model,
+			"Pip" .. tostring(index),
+			Vector3.new(0.8, 0.35, 0.8),
+			CFrame.new(origin + Vector3.new(-1.2 + (index - 1) * 1.2, 1.6, 2.6)),
+			Color3.fromRGB(255, 226, 120),
+			Enum.Material.Neon
+		)
+	end
 
 	model.PrimaryPart = head
 	model.Parent = map.towersFolder
