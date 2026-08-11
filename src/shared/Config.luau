@@ -332,7 +332,7 @@ Config.Curses = {
 -- CAVEAT: these were chosen by reading descriptions. Claude cannot hear audio.
 -- They are plausible, licensed and correctly wired, but they have never been
 -- listened to — treat them as placeholders pending a human pass.
-Config.Sounds = {
+--
 -- `maxDuration` trims a clip at playback. Source lengths were measured in Studio
 -- (4.00s, 2.59s, 1.26s, 1.33s, 1.08s, 0.86s, 2.71s) and several are far longer
 -- than the moment they mark — a Pea firing 1.2 times a second against a 4-second
