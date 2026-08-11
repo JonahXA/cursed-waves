@@ -19,6 +19,7 @@ local Audio = require(ReplicatedStorage.Shared.Audio)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local CameraController = require(script.CameraController)
 local HUD = require(script.HUD)
+local PlacementPreview = require(script.PlacementPreview)
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
@@ -27,6 +28,7 @@ local camera = Workspace.CurrentCamera
 -- a game rather than a baseplate, and it also makes accurate tower placement
 -- possible at all.
 CameraController.start()
+PlacementPreview.start()
 
 local startRun = Remotes.get("StartRun") :: RemoteEvent
 local placeTower = Remotes.get("PlaceTower") :: RemoteEvent
@@ -105,6 +107,8 @@ for towerType, b in hud.towerButtons do
 		-- Toggle: clicking the selected tower again cancels placement mode.
 		hud.selectedTower = if hud.selectedTower == towerType then nil else towerType
 		hud.selectedPlacedTower = nil
+		PlacementPreview.setSelected(hud.selectedTower)
+		Audio.play("click")
 		hud:render(hud.state)
 	end)
 end
@@ -205,12 +209,22 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if towerId then
 		hud.selectedPlacedTower = towerId
 		hud.selectedTower = nil
+		PlacementPreview.setSelected(nil)
+		Audio.play("click")
 		hud:render(hud.state)
 		return
 	end
 
 	if hud.selectedTower then
-		placeTower:FireServer(hud.selectedTower, result.Position + Vector3.new(0, 0.5, 0))
+		-- Place at the previewed point rather than re-raycasting, so what the
+		-- ghost showed is exactly what gets sent. Re-casting here could differ
+		-- by a frame and place a tower somewhere the player never saw.
+		local previewed = PlacementPreview.currentPosition()
+		placeTower:FireServer(
+			hud.selectedTower,
+			previewed or (result.Position + Vector3.new(0, 0.5, 0))
+		)
+		Audio.play("place")
 	else
 		hud.selectedPlacedTower = nil
 		hud:render(hud.state)
