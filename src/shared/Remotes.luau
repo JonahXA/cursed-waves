@@ -18,15 +18,34 @@ local Remotes = {}
 
 -- name -> class
 local DEFINITIONS: { [string]: string } = {
-	-- Client -> Server: "I clicked the button." Carries no payload; the server
-	-- decides what a click is worth. Never trust a client-supplied amount.
-	ClickCoin = "RemoteEvent",
+	-- Client -> Server: "start a run."
+	StartRun = "RemoteEvent",
+
+	-- Client -> Server: "place towerType at this position." The server validates
+	-- affordability, unlock status, and that the spot is legal. Position is the
+	-- only client-supplied value and it is range-checked against the build grid.
+	PlaceTower = "RemoteEvent",
+
+	-- Client -> Server: "upgrade / sell tower with this id."
+	UpgradeTower = "RemoteEvent",
+	SellTower = "RemoteEvent",
+
+	-- Client -> Server: "skip the remaining build timer."
+	SkipBuildPhase = "RemoteEvent",
+
+	-- Client -> Server: the hook. Payload is a curse id, or nil to bank.
+	ChooseCurse = "RemoteEvent",
 
 	-- Client -> Server: "Prompt me to buy X." Server calls MarketplaceService.
 	RequestPurchase = "RemoteEvent",
 
-	-- Server -> Client: authoritative state push (coins, multiplier, owned passes).
+	-- Server -> Client: authoritative state push.
 	StateChanged = "RemoteEvent",
+
+	-- Server -> Client: discrete moments worth feedback — wave cleared, leak,
+	-- curse taken, run ended. Sent separately from state because a state diff is
+	-- not readable as an event.
+	RunEvent = "RemoteEvent",
 
 	-- Client -> Server, yields: fetch full state on join.
 	GetState = "RemoteFunction",
